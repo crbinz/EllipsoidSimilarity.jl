@@ -1,6 +1,7 @@
 module EllipsoidSimilarity
 
 using PDMats
+import Distances: evaluate, SqMahalanobis
 
 """An Ellipsoid is defined as the level set 
 (x - m)' A (x - m) = 1 
@@ -38,7 +39,7 @@ Ellipsoid{T<:AbstractFloat}(m::Vector{T},A::Matrix{T}) = Ellipsoid{T}(m,A)
 
 Product of three exponential factors accounting for location,
 orientation, and shape of the ellipsoids. It satisfies the properties
-of a strong similarity measure.
+(given in the paper) of a strong similarity measure.
 
 Ref: Moshtaghi, M., et al., "Clustering ellipses for anomaly
 detection". Pattern Recognition 44 (2011) pp. 55-69.
@@ -46,11 +47,18 @@ detection". Pattern Recognition 44 (2011) pp. 55-69.
 function compound_similarity( E1::Ellipsoid, E2::Ellipsoid, p = 2 )
     check_dims(E1,E2)
     
-    g1 = location_similarity(E1.m, E2.m, p)
+    # the authors state that using the Euclidean norm in
+    # `location_similarity` leads to the measure being highly
+    # sensitive to differences in the mean. Instead, they recommend
+    # the use of a generalized statistical measure, the Mahalanobis
+    # distance, which is implemented here. A general
+    # `location_similarity` function for use with any norm is provided
+    # below.
+    g1 = location_similarity_mahal(E1.m, E1.A.mat, E2.m, E2.A.mat )
 
-    g2 = orientation_similarity(E1.A, E2.A, p)
+    g2 = orientation_similarity(E1.A.mat, E2.A.mat, p)
     
-    g3 = shape_similarity(E1.A, E2.A, p)
+    g3 = shape_similarity(E1.A.mat, E2.A.mat, p)
 
     return g1*g2*g3
 end
@@ -68,17 +76,22 @@ function location_similarity{T<:AbstractFloat}( m1::Vector{T}, m2::Vector{T}, p 
     return exp(-norm(m1 - m2, p))
 end
 
-function orientation_similarity{T<:AbstractFloat}(A1::AbstractPDMat{T}, A2::AbstractPDMat{T}, p )
-    R1 = eig(A1.mat)[2] 
-    R2 = eig(A2.mat)[2]
+function location_similarity_mahal{T<:AbstractFloat}( m1::Vector{T}, A1::Matrix{T},
+                                                      m2::Vector{T}, A2::Matrix{T} )
+    return exp(-evaluate(SqMahalanobis(inv(A1+A2)),m1,m2))
+end
+
+function orientation_similarity{T<:AbstractFloat}(A1::Matrix{T}, A2::Matrix{T}, p )
+    R1 = eig(A1)[2] 
+    R2 = eig(A2)[2]
     
     θ = acos(diag(R1'*R2))
     return exp(-norm(sin(θ), p))
 end
                
-function shape_similarity{T<:AbstractFloat}(A1::AbstractPDMat{T}, A2::AbstractPDMat{T}, p )
-    α = sort!(eig(A1.mat)[1])
-    β = sort!(eig(A2.mat)[1])
+function shape_similarity{T<:AbstractFloat}(A1::Matrix{T}, A2::Matrix{T}, p )
+    α = sort!(eig(A1)[1])
+    β = sort!(eig(A2)[1])
 
     α_star = 1./sqrt(α)
     β_star = 1./sqrt(β)
