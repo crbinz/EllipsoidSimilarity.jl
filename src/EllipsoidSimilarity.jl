@@ -34,6 +34,7 @@ end
 
 Ellipsoid{T<:AbstractFloat}(m::Vector{T},A::Matrix{T}) = Ellipsoid{T}(m,A)
 
+abstract EllipsoidSimilarityMeasure <: Real
 
 """Compound similarity
 
@@ -44,7 +45,24 @@ orientation, and shape of the ellipsoids. It satisfies the properties
 Ref: Moshtaghi, M., et al., "Clustering ellipses for anomaly
 detection". Pattern Recognition 44 (2011) pp. 55-69.
 """
-function compound_similarity( E1::Ellipsoid, E2::Ellipsoid, p = 2 )
+type Compound <: EllipsoidSimilarityMeasure end
+
+"""Transformation energy similarity
+
+Product of three exponential factors accounting for location,
+orientation, and shape of the ellipsoids. It satisfies the properties
+(given in the paper) of a strong similarity measure.
+
+Ref: Moshtaghi, M., et al., "Clustering ellipses for anomaly
+detection". Pattern Recognition 44 (2011) pp. 55-69.
+"""
+type TransformationEnergy <: EllipsoidSimilarityMeasure end
+
+function similarity( meas::TransformationEnergy, E1::Ellipsoid, E2::Ellipsoid, p = 2 )
+
+end
+
+function similarity( meas::Compound, E1::Ellipsoid, E2::Ellipsoid, p = 2 )
     check_dims(E1,E2)
     
     # the authors state that using the Euclidean norm in
