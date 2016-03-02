@@ -58,9 +58,37 @@ detection". Pattern Recognition 44 (2011) pp. 55-69.
 """
 type TransformationEnergy <: EllipsoidSimilarityMeasure end
 
-function similarity( meas::TransformationEnergy, E1::Ellipsoid, E2::Ellipsoid, p = 2 )
 
+function similarity( meas::TransformationEnergy, E1::Ellipsoid, E2::Ellipsoid, p = 2 )
+    S1, S2 = scalematrix(E1.A), scalematrix(E2.A)
+    R1, R2 = rotmatrix(E1.A), rotmatrix(E2.A)
+    M_12 = S2*R2\R1\S1
+    M_21 = S1*R1\R2\S2
+    d_12 = S2*R2*(E2.m - E1.m)
+    d_12 = S1*R1*(E1.m - E2.m)
+
+    # use the approximation given by the authors at the end of Section 4.
+    # find the maximum singular values for each of M_12 and M_21
+    σ_12 = maximum(svd(M_12)[2])
+    σ_21 = maximum(svd(M_21)[2])
+
+    return maximum([σ_12 + norm(d_12),
+                    σ_21 + norm(d_21)])
 end
+
+"""Compute the 'scale matrix' given an ellipse represented by `A`. This
+is a diagonal matrix whose elements are the recipricol of the square
+root of the eigenvalues of `A`.
+"""
+function scalematrix{T<:AbstractFloat}( A::AbstractPDMat{T} )
+    vals = eig(A.mat)[1]
+    return diagm(1./sqrt(vals))
+end
+
+function rotmatrix{T<:AbstractFloat}( A::AbstractPDMat{T} )
+    return eig(A.mat)[2]
+end
+
 
 function similarity( meas::Compound, E1::Ellipsoid, E2::Ellipsoid, p = 2 )
     check_dims(E1,E2)
@@ -118,3 +146,6 @@ function shape_similarity{T<:AbstractFloat}(A1::Matrix{T}, A2::Matrix{T}, p )
 end
 
 end
+
+
+    
