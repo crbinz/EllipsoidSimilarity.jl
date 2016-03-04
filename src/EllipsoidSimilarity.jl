@@ -128,7 +128,7 @@ function similarity( meas::TransformationEnergy, E1::Ellipsoid, E2::Ellipsoid )
     σ_12 = maximum(svd(M_12)[2])
     σ_21 = maximum(svd(M_21)[2])
 
-    return maximum([σ_12 + norm(d_12),
+    return 1.0 / maximum([σ_12 + norm(d_12),
                     σ_21 + norm(d_21)])
 end
 
