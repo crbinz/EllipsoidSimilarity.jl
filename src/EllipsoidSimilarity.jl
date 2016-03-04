@@ -58,14 +58,70 @@ detection". Pattern Recognition 44 (2011) pp. 55-69.
 """
 type TransformationEnergy <: EllipsoidSimilarityMeasure end
 
+"""Generalized Focal Distance
 
-function similarity( meas::TransformationEnergy, E1::Ellipsoid, E2::Ellipsoid, p = 2 )
+Average of the planar focal distances in all dimensions.
+
+Ref: Moshtaghi, M., et al., "Clustering ellipses for anomaly
+detection". Pattern Recognition 44 (2011) pp. 55-69.
+"""
+type GeneralizedFocalDist <: EllipsoidSimilarityMeasure end
+
+function similarity( meas::GeneralizedFocalDist, E1::Ellipsoid, E2::Ellipsoid )
+    epts = focalsegments(E1)
+    fpts = focalsegments(E2)
+
+    dis = 0.0
+    for i in 1:(E1.A.dim-1)
+        dis += focaldist(epts[i], fpts[i])
+    end
+    return dis/(E1.A.dim-1)
+end
+
+function focaldist( epts::Tuple{Vector{Float64},Vector{Float64}},
+                    fpts::Tuple{Vector{Float64},Vector{Float64}} )
+    # d ordering:
+    #   d(e1, f1)
+    #   d(e1, f2)
+    #   d(e2, f1)
+    #   d(e2, f2)
+    d = zeros(4)
+    for i in 1:2
+        d[2i-1] = norm(epts[i] - fpts[1])
+        d[2i]   = norm(epts[i] - fpts[2])
+    end
+
+    return 0.25 * ( minimum(d[1:2]) +
+                    minimum(d[3:4]) +
+                    minimum([d[1],d[3]]) +
+                    minimum([d[2],d[4]]) )
+end
+
+"Returns coordinates of all focal segment endpoints of E"
+function focalsegments( E::Ellipsoid )
+    segments = Array{Tuple{Vector{eltype(E.m)},Vector{eltype(E.m)}}}(E.A.dim - 1)
+
+    (evals, evecs) = eig(E.A.mat)
+    sortidx = sortperm(evals)
+
+    for i in 1:(E.A.dim-1)
+        α2 = evals[sortidx[i+1]]
+        u2 = evecs[:,sortidx[i+1]]
+        α1 = evals[sortidx[i]]
+
+        s = 0.5 * sqrt((α2 - α1)/(α2 * α1))
+        segments[i] = (E.m + s*u2, E.m - s*u2)
+    end
+    return segments
+end
+
+function similarity( meas::TransformationEnergy, E1::Ellipsoid, E2::Ellipsoid )
     S1, S2 = scalematrix(E1.A), scalematrix(E2.A)
     R1, R2 = rotmatrix(E1.A), rotmatrix(E2.A)
     M_12 = S2*R2\R1\S1
     M_21 = S1*R1\R2\S2
     d_12 = S2*R2*(E2.m - E1.m)
-    d_12 = S1*R1*(E1.m - E2.m)
+    d_21 = S1*R1*(E1.m - E2.m)
 
     # use the approximation given by the authors at the end of Section 4.
     # find the maximum singular values for each of M_12 and M_21
