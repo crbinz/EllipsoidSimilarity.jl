@@ -3,6 +3,12 @@ module EllipsoidSimilarity
 using PDMats
 import Distances: evaluate, SqMahalanobis
 
+export Ellipsoid,
+       Compound,
+       TransformationEnergy,
+       GeneralizedFocalDist,
+       similarity
+
 """An Ellipsoid is defined as the level set 
 (x - m)' A (x - m) = 1 
 
