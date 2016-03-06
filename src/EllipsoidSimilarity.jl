@@ -81,7 +81,7 @@ function similarity( meas::GeneralizedFocalDist, E1::Ellipsoid, E2::Ellipsoid )
     for i in 1:(E1.A.dim-1)
         dis += focaldist(epts[i], fpts[i])
     end
-    return dis/(E1.A.dim-1)
+    return 1.0 - dis/(E1.A.dim-1)
 end
 
 function focaldist( epts::Tuple{Vector{Float64},Vector{Float64}},
