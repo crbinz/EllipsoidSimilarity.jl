@@ -1,6 +1,6 @@
 module EllipsoidSimilarity
 
-using PDMats
+using PDMats, NLopt
 import Distances: evaluate, SqMahalanobis
 
 export Ellipsoid,
@@ -121,34 +121,57 @@ function focalsegments( E::Ellipsoid )
     return segments
 end
 
-function similarity( meas::TransformationEnergy, E1::Ellipsoid, E2::Ellipsoid )
-    S1, S2 = scalematrix(E1.A), scalematrix(E2.A)
-    R1, R2 = rotmatrix(E1.A), rotmatrix(E2.A)
-    M_12 = S2*R2\R1\S1
-    M_21 = S1*R1\R2\S2
+function similarity( meas::TransformationEnergy, E1::Ellipsoid, E2::Ellipsoid; approx = false )
+    S1, R1 = scale_and_rot_matrix(E1.A)
+    S2, R2 = scale_and_rot_matrix(E2.A)
+    M_12 = S2*R2*inv(R1)*inv(S1)
+    M_21 = S1*R1*inv(R2)*inv(S2)
     d_12 = S2*R2*(E2.m - E1.m)
     d_21 = S1*R1*(E1.m - E2.m)
 
-    # use the approximation given by the authors at the end of Section 4.
-    # find the maximum singular values for each of M_12 and M_21
-    σ_12 = maximum(svd(M_12)[2])
-    σ_21 = maximum(svd(M_21)[2])
+    if !approx
+        # solve the minimization problem posed in the paper
+        dist_1 = -te_minimize(M_12, d_12)
+        dist_2 = -te_minimize(M_21, d_21)
 
-    return 1.0 / maximum([σ_12 + norm(d_12),
-                    σ_21 + norm(d_21)])
+        return 1.0/maximum([dist_1,dist_2])
+    else
+        # approximation given by the authors at the end of Section 4.
+        # find the maximum singular values for each of M_12 and M_21
+        σ_12 = maximum(svd(M_12)[2])
+        σ_21 = maximum(svd(M_21)[2])
+
+        return 1.0 / maximum([σ_12 + norm(d_12),
+                        σ_21 + norm(d_21)])
+    end
+end
+
+function te_minimize{T<:AbstractFloat}( M::Matrix{T}, d::Vector{T} )
+    N = length(d)
+    @assert N == size(M)[1]
+    f(x, grad) = -norm(M*x + d)
+    opt = Opt(:LN_COBYLA, N)
+    xtol_rel!(opt,1e-4)
+
+    min_objective!(opt, f)
+
+    h(x, grad) = norm(x) - 1.0 # should be unit vector
+    equality_constraint!(opt, h, 1e-6)
+
+    xi = zeros(N)
+    xi[1] = 1.0
+    (minf,minx,ret) = optimize(opt, xi)
+
+    return minf
 end
 
 """Compute the 'scale matrix' given an ellipse represented by `A`. This
 is a diagonal matrix whose elements are the recipricol of the square
 root of the eigenvalues of `A`.
 """
-function scalematrix{T<:AbstractFloat}( A::AbstractPDMat{T} )
-    vals = eig(A.mat)[1]
-    return diagm(1./sqrt(vals))
-end
-
-function rotmatrix{T<:AbstractFloat}( A::AbstractPDMat{T} )
-    return eig(A.mat)[2]
+function scale_and_rot_matrix{T<:AbstractFloat}( A::AbstractPDMat{T} )
+    (_, S, V) = svd(A.mat)
+    return (sqrt(inv(diagm(S))), V)
 end
 
 
