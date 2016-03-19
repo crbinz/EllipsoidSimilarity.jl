@@ -84,6 +84,11 @@ function similarity( meas::GeneralizedFocalDist, E1::Ellipsoid, E2::Ellipsoid )
     return 1.0 - dis/(E1.A.dim-1)
 end
 
+function gfd_similarity{T<:AbstractFloat}( m1::Vector{T}, A1::Matrix{T},
+                                          m2::Vector{T}, A2::Matrix{T} )
+    similarity(GeneralizedFocalDist(),Ellipsoid(m1,A1),Ellipsoid(m2,A2))
+end
+
 function focaldist( epts::Tuple{Vector{Float64},Vector{Float64}},
                     fpts::Tuple{Vector{Float64},Vector{Float64}} )
     # d ordering:
@@ -107,16 +112,16 @@ end
 function focalsegments( E::Ellipsoid )
     segments = Array{Tuple{Vector{eltype(E.m)},Vector{eltype(E.m)}}}(E.A.dim - 1)
 
-    (evals, evecs) = eig(E.A.mat)
-    sortidx = sortperm(evals)
+    (U,S,V) = svd(E.A.mat)
+    si = sortperm(S) # maybe not necessary?
 
     for i in 1:(E.A.dim-1)
-        α2 = evals[sortidx[i+1]]
-        u2 = evecs[:,sortidx[i+1]]
-        α1 = evals[sortidx[i]]
+        α1 = S[si[i]]
+        α2 = S[si[i+1]]
+        u2 = V[:,si[i]]
 
-        s = 0.5 * sqrt((α2 - α1)/(α2 * α1))
-        segments[i] = (E.m + s*u2, E.m - s*u2)
+        c = 0.5 * sqrt((α2 - α1)/(α2 * α1))
+        segments[i] = (E.m + c*u2, E.m - c*u2)
     end
     return segments
 end
@@ -144,6 +149,11 @@ function similarity( meas::TransformationEnergy, E1::Ellipsoid, E2::Ellipsoid; a
         return 1.0 / maximum([σ_12 + norm(d_12),
                         σ_21 + norm(d_21)])
     end
+end
+
+function te_similarity{T<:AbstractFloat}( m1::Vector{T}, A1::Matrix{T},
+                                         m2::Vector{T}, A2::Matrix{T} )
+    similarity(TransformationEnergy(),Ellipsoid(m1,A1),Ellipsoid(m2,A2))
 end
 
 function te_minimize{T<:AbstractFloat}( M::Matrix{T}, d::Vector{T} )
@@ -195,8 +205,8 @@ function similarity( meas::Compound, E1::Ellipsoid, E2::Ellipsoid, p = 2 )
 end
     
 function compound_similarity{T<:AbstractFloat}( m1::Vector{T}, A1::Matrix{T},
-                                                m2::Vector{T}, A2::Matrix{T} )
-    compound_similarity(Ellipsoid(m1,A1),Ellipsoid(m2,A2))
+                                         m2::Vector{T}, A2::Matrix{T} )
+    similarity(Compound(),Ellipsoid(m1,A1),Ellipsoid(m2,A2))
 end
 
 function check_dims(E1::Ellipsoid, E2::Ellipsoid)
