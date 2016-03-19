@@ -84,7 +84,7 @@ function similarity( meas::GeneralizedFocalDist, E1::Ellipsoid, E2::Ellipsoid )
     return 1.0 - dis/(E1.A.dim-1)
 end
 
-function gfd_similarity{T<:AbstractFloat}( m1::Vector{T}, A1::Matrix{T},
+function gf_similarity{T<:AbstractFloat}( m1::Vector{T}, A1::Matrix{T},
                                           m2::Vector{T}, A2::Matrix{T} )
     similarity(GeneralizedFocalDist(),Ellipsoid(m1,A1),Ellipsoid(m2,A2))
 end
