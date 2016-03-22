@@ -1,3 +1,7 @@
+### Installation
+In the Julia REPL, type
+`Pkg.clone("https://github.com/crbinz/EllipsoidSimilarity.jl")`
+
 ### Quick start
 First, let's define an ellipsoid as the pair `(m, A)`, where `m` is an `Nx1` vector, `A` is a symmetric, positive definite matrix, and  
 `(x - m)' A (x - m) = 1`  
