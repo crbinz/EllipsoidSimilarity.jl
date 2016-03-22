@@ -6,8 +6,10 @@ import Distances: evaluate, SqMahalanobis
 export Ellipsoid,
        Compound,
        TransformationEnergy,
-       GeneralizedFocalDist,
-       similarity
+       similarity,
+       compound_similarity,
+       te_similarity
+       
 
 """An Ellipsoid is defined as the level set 
 (x - m)' A (x - m) = 1 
@@ -205,7 +207,7 @@ function similarity( meas::Compound, E1::Ellipsoid, E2::Ellipsoid, p = 2 )
 end
     
 function compound_similarity{T<:AbstractFloat}( m1::Vector{T}, A1::Matrix{T},
-                                         m2::Vector{T}, A2::Matrix{T} )
+                                                m2::Vector{T}, A2::Matrix{T} )
     similarity(Compound(),Ellipsoid(m1,A1),Ellipsoid(m2,A2))
 end
 
