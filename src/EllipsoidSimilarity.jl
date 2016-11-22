@@ -1,6 +1,6 @@
 module EllipsoidSimilarity
 
-using PDMats, NLopt
+using PDMats, NLopt, Compat
 import Distances: evaluate, SqMahalanobis
 
 export Ellipsoid,
@@ -19,28 +19,27 @@ where m is a px1 vector and A is a pxp positive definite matrix.
 immutable Ellipsoid{T<:AbstractFloat}
     m::Vector{T}
     A::AbstractPDMat{T}
-    
-    function Ellipsoid(m2::Vector{T}, A2::Matrix{T})
-        local A_pd
-        try
-            A_pd = PDMat(A2)
-        catch e
-            if isa(e, Base.LinAlg.PosDefException)
-                error("Matrix must be postivie definite")
-            else
-                throw(e)
-            end
-        end
-
-        if length(m2) != A_pd.dim
-            error("Center vector dimension and matrix dimension do not match")
-        end
-            
-        new(m2, A_pd)
-    end
 end
 
-Ellipsoid{T<:AbstractFloat}(m::Vector{T},A::Matrix{T}) = Ellipsoid{T}(m,A)
+function Ellipsoid{T}(m2::Vector{T}, A2::AbstractMatrix{T})
+    local A_pd
+    try
+        A_pd = PDMat(A2)
+    catch e
+        if isa(e, Base.LinAlg.PosDefException)
+            error("Matrix must be postivie definite")
+        else
+            @show A2
+            throw(e)
+        end
+    end
+
+    if length(m2) != A_pd.dim
+        error("Center vector dimension and matrix dimension do not match")
+    end
+
+    Ellipsoid(m2,A_pd)
+end
 
 abstract EllipsoidSimilarityMeasure <: Real
 
@@ -86,8 +85,8 @@ function similarity( meas::GeneralizedFocalDist, E1::Ellipsoid, E2::Ellipsoid )
     return 1.0 - dis/(E1.A.dim-1)
 end
 
-function gf_similarity{T<:AbstractFloat}( m1::Vector{T}, A1::Matrix{T},
-                                          m2::Vector{T}, A2::Matrix{T} )
+function gf_similarity{T<:AbstractFloat}( m1::Vector{T}, A1::AbstractMatrix{T},
+                                          m2::Vector{T}, A2::AbstractMatrix{T} )
     similarity(GeneralizedFocalDist(),Ellipsoid(m1,A1),Ellipsoid(m2,A2))
 end
 
@@ -153,12 +152,12 @@ function similarity( meas::TransformationEnergy, E1::Ellipsoid, E2::Ellipsoid; a
     end
 end
 
-function te_similarity{T<:AbstractFloat}( m1::Vector{T}, A1::Matrix{T},
-                                         m2::Vector{T}, A2::Matrix{T} )
+function te_similarity{T<:AbstractFloat}( m1::Vector{T}, A1::AbstractMatrix{T},
+                                         m2::Vector{T}, A2::AbstractMatrix{T} )
     similarity(TransformationEnergy(),Ellipsoid(m1,A1),Ellipsoid(m2,A2))
 end
 
-function te_minimize{T<:AbstractFloat}( M::Matrix{T}, d::Vector{T} )
+function te_minimize{T<:AbstractFloat}( M::AbstractMatrix{T}, d::Vector{T} )
     N = length(d)
     @assert N == size(M)[1]
     f(x, grad) = -norm(M*x + d)
@@ -206,8 +205,8 @@ function similarity( meas::Compound, E1::Ellipsoid, E2::Ellipsoid, p = 2 )
     return g1*g2*g3
 end
     
-function compound_similarity{T<:AbstractFloat}( m1::Vector{T}, A1::Matrix{T},
-                                                m2::Vector{T}, A2::Matrix{T} )
+function compound_similarity{T<:AbstractFloat}( m1::Vector{T}, A1::AbstractMatrix{T},
+                                                m2::Vector{T}, A2::AbstractMatrix{T} )
     similarity(Compound(),Ellipsoid(m1,A1),Ellipsoid(m2,A2))
 end
 
@@ -219,20 +218,20 @@ function location_similarity{T<:AbstractFloat}( m1::Vector{T}, m2::Vector{T}, p 
     return exp(-norm(m1 - m2, p))
 end
 
-function location_similarity_mahal{T<:AbstractFloat}( m1::Vector{T}, A1::Matrix{T},
-                                                      m2::Vector{T}, A2::Matrix{T} )
+function location_similarity_mahal{T<:AbstractFloat}( m1::Vector{T}, A1::AbstractMatrix{T},
+                                                      m2::Vector{T}, A2::AbstractMatrix{T} )
     return exp(-evaluate(SqMahalanobis(inv(A1+A2)),m1,m2))
 end
 
-function orientation_similarity{T<:AbstractFloat}(A1::Matrix{T}, A2::Matrix{T}, p )
+function orientation_similarity{T<:AbstractFloat}(A1::AbstractMatrix{T}, A2::AbstractMatrix{T}, p )
     R1 = eig(A1)[2] 
     R2 = eig(A2)[2]
     
-    θ = acos(diag(R1'*R2))
+    θ = acos(clamp(diag(R1'*R2),-1,1))
     return exp(-norm(sin(θ), p))
 end
                
-function shape_similarity{T<:AbstractFloat}(A1::Matrix{T}, A2::Matrix{T}, p )
+function shape_similarity{T<:AbstractFloat}(A1::AbstractMatrix{T}, A2::AbstractMatrix{T}, p )
     α = sort!(eig(A1)[1])
     β = sort!(eig(A2)[1])
 
