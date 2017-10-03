@@ -41,7 +41,7 @@ function Ellipsoid{T}(m2::Vector{T}, A2::AbstractMatrix{T})
     Ellipsoid(m2,A_pd)
 end
 
-abstract EllipsoidSimilarityMeasure <: Real
+@compat abstract type EllipsoidSimilarityMeasure <: Real end
 
 """Compound similarity
 
