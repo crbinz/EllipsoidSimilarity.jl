@@ -182,7 +182,7 @@ root of the eigenvalues of `A`.
 """
 function scale_and_rot_matrix{T<:AbstractFloat}( A::AbstractPDMat{T} )
     (_, S, V) = svd(A.mat)
-    return (sqrt(inv(diagm(S))), V)
+    return (sqrt.(inv(diagm(S))), V)
 end
 
 
@@ -227,16 +227,16 @@ function orientation_similarity{T<:AbstractFloat}(A1::AbstractMatrix{T}, A2::Abs
     R1 = eig(A1)[2] 
     R2 = eig(A2)[2]
     
-    θ = acos(clamp(diag(R1'*R2),-1,1))
-    return exp(-norm(sin(θ), p))
+    θ = acos.(clamp.(diag(R1'*R2),-1,1))
+    return exp(-norm(sin.(θ), p))
 end
                
 function shape_similarity{T<:AbstractFloat}(A1::AbstractMatrix{T}, A2::AbstractMatrix{T}, p )
     α = sort!(eig(A1)[1])
     β = sort!(eig(A2)[1])
 
-    α_star = 1./sqrt(α)
-    β_star = 1./sqrt(β)
+    α_star = 1./sqrt.(α)
+    β_star = 1./sqrt.(β)
 
     return exp(-norm(α_star - β_star, p))
 end
