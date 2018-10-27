@@ -1,6 +1,6 @@
 module EllipsoidSimilarity
 
-using PDMats, NLopt, Compat
+using PDMats, NLopt, LinearAlgebra
 import Distances: evaluate, SqMahalanobis
 
 export Ellipsoid,
@@ -16,12 +16,12 @@ export Ellipsoid,
 
 where m is a px1 vector and A is a pxp positive definite matrix.
 """
-immutable Ellipsoid{T<:AbstractFloat}
+struct Ellipsoid{T<:AbstractFloat}
     m::Vector{T}
     A::AbstractPDMat{T}
 end
 
-function Ellipsoid{T}(m2::Vector{T}, A2::AbstractMatrix{T})
+function Ellipsoid(m2::Vector{T}, A2::AbstractMatrix{T}) where T
     local A_pd
     try
         A_pd = PDMat(A2)
@@ -41,7 +41,7 @@ function Ellipsoid{T}(m2::Vector{T}, A2::AbstractMatrix{T})
     Ellipsoid(m2,A_pd)
 end
 
-@compat abstract type EllipsoidSimilarityMeasure <: Real end
+abstract type EllipsoidSimilarityMeasure <: Real end
 
 """Compound similarity
 
@@ -52,7 +52,7 @@ orientation, and shape of the ellipsoids. It satisfies the properties
 Ref: Moshtaghi, M., et al., "Clustering ellipses for anomaly
 detection". Pattern Recognition 44 (2011) pp. 55-69.
 """
-type Compound <: EllipsoidSimilarityMeasure end
+mutable struct Compound <: EllipsoidSimilarityMeasure end
 
 """Transformation energy similarity
 
@@ -63,7 +63,7 @@ orientation, and shape of the ellipsoids. It satisfies the properties
 Ref: Moshtaghi, M., et al., "Clustering ellipses for anomaly
 detection". Pattern Recognition 44 (2011) pp. 55-69.
 """
-type TransformationEnergy <: EllipsoidSimilarityMeasure end
+mutable struct TransformationEnergy <: EllipsoidSimilarityMeasure end
 
 """Generalized Focal Distance
 
@@ -72,7 +72,7 @@ Average of the planar focal distances in all dimensions.
 Ref: Moshtaghi, M., et al., "Clustering ellipses for anomaly
 detection". Pattern Recognition 44 (2011) pp. 55-69.
 """
-type GeneralizedFocalDist <: EllipsoidSimilarityMeasure end
+mutable struct GeneralizedFocalDist <: EllipsoidSimilarityMeasure end
 
 function similarity( meas::GeneralizedFocalDist, E1::Ellipsoid, E2::Ellipsoid )
     epts = focalsegments(E1)
@@ -85,8 +85,8 @@ function similarity( meas::GeneralizedFocalDist, E1::Ellipsoid, E2::Ellipsoid )
     return 1.0 - dis/(E1.A.dim-1)
 end
 
-function gf_similarity{T<:AbstractFloat}( m1::Vector{T}, A1::AbstractMatrix{T},
-                                          m2::Vector{T}, A2::AbstractMatrix{T} )
+function gf_similarity( m1::Vector{T}, A1::AbstractMatrix{T},
+                        m2::Vector{T}, A2::AbstractMatrix{T} ) where T<:AbstractFloat
     similarity(GeneralizedFocalDist(),Ellipsoid(m1,A1),Ellipsoid(m2,A2))
 end
 
@@ -152,12 +152,12 @@ function similarity( meas::TransformationEnergy, E1::Ellipsoid, E2::Ellipsoid; a
     end
 end
 
-function te_similarity{T<:AbstractFloat}( m1::Vector{T}, A1::AbstractMatrix{T},
-                                         m2::Vector{T}, A2::AbstractMatrix{T} )
+function te_similarity( m1::Vector{T}, A1::AbstractMatrix{T},
+                       m2::Vector{T}, A2::AbstractMatrix{T} ) where T<:AbstractFloat
     similarity(TransformationEnergy(),Ellipsoid(m1,A1),Ellipsoid(m2,A2))
 end
 
-function te_minimize{T<:AbstractFloat}( M::AbstractMatrix{T}, d::Vector{T} )
+function te_minimize( M::AbstractMatrix{T}, d::Vector{T} ) where T<:AbstractFloat
     N = length(d)
     @assert N == size(M)[1]
     f(x, grad) = -norm(M*x + d)
@@ -180,9 +180,9 @@ end
 is a diagonal matrix whose elements are the recipricol of the square
 root of the eigenvalues of `A`.
 """
-function scale_and_rot_matrix{T<:AbstractFloat}( A::AbstractPDMat{T} )
+function scale_and_rot_matrix( A::AbstractPDMat{T} ) where T<:AbstractFloat
     (_, S, V) = svd(A.mat)
-    return (sqrt.(inv(diagm(S))), V)
+    return (sqrt.(inv(diagm(0=>S))), V)
 end
 
 
@@ -205,8 +205,8 @@ function similarity( meas::Compound, E1::Ellipsoid, E2::Ellipsoid, p = 2 )
     return g1*g2*g3
 end
     
-function compound_similarity{T<:AbstractFloat}( m1::Vector{T}, A1::AbstractMatrix{T},
-                                                m2::Vector{T}, A2::AbstractMatrix{T} )
+function compound_similarity( m1::Vector{T}, A1::AbstractMatrix{T},
+                              m2::Vector{T}, A2::AbstractMatrix{T} ) where T<:AbstractFloat
     similarity(Compound(),Ellipsoid(m1,A1),Ellipsoid(m2,A2))
 end
 
@@ -214,29 +214,29 @@ function check_dims(E1::Ellipsoid, E2::Ellipsoid)
     @assert E1.A.dim == E2.A.dim
 end
 
-function location_similarity{T<:AbstractFloat}( m1::Vector{T}, m2::Vector{T}, p )
+function location_similarity( m1::Vector{T}, m2::Vector{T}, p ) where T<:AbstractFloat
     return exp(-norm(m1 - m2, p))
 end
 
-function location_similarity_mahal{T<:AbstractFloat}( m1::Vector{T}, A1::AbstractMatrix{T},
-                                                      m2::Vector{T}, A2::AbstractMatrix{T} )
+function location_similarity_mahal( m1::Vector{T}, A1::AbstractMatrix{T},
+                                    m2::Vector{T}, A2::AbstractMatrix{T} ) where T<:AbstractFloat
     return exp(-evaluate(SqMahalanobis(inv(A1+A2)),m1,m2))
 end
 
-function orientation_similarity{T<:AbstractFloat}(A1::AbstractMatrix{T}, A2::AbstractMatrix{T}, p )
-    R1 = eig(A1)[2] 
-    R2 = eig(A2)[2]
+function orientation_similarity(A1::AbstractMatrix{T}, A2::AbstractMatrix{T}, p ) where T<:AbstractFloat
+    R1 = eigen(A1).vectors
+    R2 = eigen(A2).vectors
     
     θ = acos.(clamp.(diag(R1'*R2),-1,1))
     return exp(-norm(sin.(θ), p))
 end
                
-function shape_similarity{T<:AbstractFloat}(A1::AbstractMatrix{T}, A2::AbstractMatrix{T}, p )
-    α = sort!(eig(A1)[1])
-    β = sort!(eig(A2)[1])
+function shape_similarity(A1::AbstractMatrix{T}, A2::AbstractMatrix{T}, p ) where T<:AbstractFloat
+    α = sort!(eigen(A1).values)
+    β = sort!(eigen(A2).values)
 
-    α_star = 1./sqrt.(α)
-    β_star = 1./sqrt.(β)
+    α_star = 1 ./ sqrt.(α)
+    β_star = 1 ./ sqrt.(β)
 
     return exp(-norm(α_star - β_star, p))
 end
