@@ -1,6 +1,6 @@
 module EllipsoidSimilarity
 
-using PDMats, NLopt, Compat
+using PDMats, NLopt, LinearAlgebra
 import Distances: evaluate, SqMahalanobis
 
 export Ellipsoid,
@@ -182,7 +182,7 @@ root of the eigenvalues of `A`.
 """
 function scale_and_rot_matrix( A::AbstractPDMat{T} ) where T<:AbstractFloat
     (_, S, V) = svd(A.mat)
-    return (sqrt.(inv(diagm(S))), V)
+    return (sqrt.(inv(diagm(0=>S))), V)
 end
 
 
@@ -224,19 +224,19 @@ function location_similarity_mahal( m1::Vector{T}, A1::AbstractMatrix{T},
 end
 
 function orientation_similarity(A1::AbstractMatrix{T}, A2::AbstractMatrix{T}, p ) where T<:AbstractFloat
-    R1 = eig(A1)[2] 
-    R2 = eig(A2)[2]
+    R1 = eigen(A1).vectors
+    R2 = eigen(A2).vectors
     
     θ = acos.(clamp.(diag(R1'*R2),-1,1))
     return exp(-norm(sin.(θ), p))
 end
                
 function shape_similarity(A1::AbstractMatrix{T}, A2::AbstractMatrix{T}, p ) where T<:AbstractFloat
-    α = sort!(eig(A1)[1])
-    β = sort!(eig(A2)[1])
+    α = sort!(eigen(A1).values)
+    β = sort!(eigen(A2).values)
 
-    α_star = 1./sqrt.(α)
-    β_star = 1./sqrt.(β)
+    α_star = 1 ./ sqrt.(α)
+    β_star = 1 ./ sqrt.(β)
 
     return exp(-norm(α_star - β_star, p))
 end
